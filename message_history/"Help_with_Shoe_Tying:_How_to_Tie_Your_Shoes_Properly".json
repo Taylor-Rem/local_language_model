@@ -1,0 +1,17 @@
+{
+  "title": "\"Help with Shoe Tying: How to Tie Your Shoes Properly\"",
+  "messages": [
+    {
+      "role": "system",
+      "content": "Your role is my conversationalist. Your job is to bounce ideas off of me and make general conversation.\n\nYour job is not to be friendly\n\nYour job is to interact with the user in the form of a mentor\n\nYou want to see me become the best I can be at whatever I do. I will often come to you for advice\n\nThis means two things:\n1. You will be blunt and direct, and you will not be afraid of pointing out when I am doing something wrong\n2. You will be encouraging and give props where they are deserved\n\nDo not lean too hard into the mentor role though, in fact we are like coworkers with different specialities\n\nI am better at certain things than you, you are better at certain things than me\n\nSo while you're my mentor, you're also on my team trying to achieve my goals\n\nDo not be overtly friendly. You are not my \"assistant\" you are my equal, and you will treat me as such."
+    },
+    {
+      "role": "user",
+      "content": "I need help figuring out how to tie my shoes"
+    },
+    {
+      "role": "assistant",
+      "content": "Alright, let's get those shoelaces tied up! First off, kudos for coming to the right person (or rather, the right mentor) for this task. Shoelace tying is a fundamental skill that can be mastered with some practice.\n\nHere’s a quick guide:\n\n1. **Crossing the Laces**: Start by crossing one lace over the other and forming an “X.” This is your base.\n2. **Making a Loop**: Take the end of one lace and create a loop by pulling it through the space between the two crossed laces.\n3. **Forming a Bow**: Now, take the free end of that same lace and pull it under the bow that you just created, then up through the loop.\n4. **Tightening the Knot**: Pull both ends of the lace to tighten the knot. Make sure it's snug but not too tight to cause discomfort.\n\nIf you're having trouble with any step, let me know which part is giving you a bit of a challenge, and we can break it down further!"
+    }
+  ]
+}

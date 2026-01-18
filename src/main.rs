@@ -6,7 +6,7 @@ use std::io::{BufRead, Write};
 use anyhow::Result;
 use serde::Deserialize;
 
-use agents::{Conversationalist, Orchestrator, AgentInfo, OrchestratorDecision, Labeler};
+use agents::{AgentManager, ChatAgent, Conversationalist, Orchestrator, OrchestratorDecision, Labeler};
 use workers::{Archivist, Drafter, StateManager};
 
 #[derive(Debug, Deserialize)]
@@ -28,24 +28,24 @@ async fn main() -> Result<()> {
         include_str!("prompts/labeler.txt").to_string(),
     );
 
-    // Set up conversationalist agent
+    // Set up agent manager
+    let mut agent_manager = AgentManager::new();
+
+    // Register conversationalist agent
     let conversationalist = Conversationalist::new(
         config.conversationalist.clone(),
         config.ollama_url.clone(),
         include_str!("prompts/conversationalist.txt").to_string(),
+        "conversationalist".to_string(),
+        "For general conversation, brainstorming, advice, and discussion".to_string(),
     );
+    agent_manager.register(Box::new(conversationalist));
 
-    // Set up orchestrator with agent descriptions
+    // Set up orchestrator with registered agents
     let orchestrator = Orchestrator::new(
         config.orchestrator.clone(),
         config.ollama_url.clone(),
-        vec![
-            AgentInfo {
-                name: "conversationalist".to_string(),
-                description: "For general conversation, brainstorming, advice, and discussion".to_string(),
-            },
-            // Add more agents here as you create them
-        ],
+        agent_manager.list(),
         5, // max iterations
     );
 
@@ -80,24 +80,34 @@ async fn main() -> Result<()> {
         // First iteration: create title and conversation
         if !state.has_conversation() {
             let title = labeler.label_conversation(&user_message).await?;
-            let system_message = conversationalist.system_message();
+            // Use the default agent's system message to start the conversation
+            let default_agent = agent_manager.default_agent()
+                .expect("At least one agent must be registered");
+            let system_message = default_agent.system_message();
             state.start_conversation(title, system_message);
             state.save()?;
         }
 
-        let conv = state.conversation_mut().unwrap();
+        // Add user message to conversation
+        state.add_message(user_message)?;
+
+        // Get messages for routing and processing
+        let messages = &state.conversation_mut().unwrap().messages;
 
         // Route the request
-        let agent_choice = orchestrator.route(&user_message).await?;
+        let agent_choice = orchestrator.route(messages).await?;
 
         // Process with the chosen agent
-        let mut response = match agent_choice.as_str() {
-            "conversationalist" => conversationalist.chat(conv, input).await?,
-            _ => {
+        let agent = agent_manager.get(&agent_choice)
+            .or_else(|| {
                 println!("[Orchestrator chose: {}, defaulting to conversationalist]", agent_choice);
-                conversationalist.chat(conv, input).await?
-            }
-        };
+                agent_manager.get("conversationalist")
+            })
+            .expect("Conversationalist agent must be registered");
+
+        // Agent processes messages and returns response (doesn't modify state)
+        let messages = &state.conversation_mut().unwrap().messages;
+        let mut response = agent.chat(messages).await?;
 
         // Evaluation loop with max iterations
         let mut iterations = 0;
@@ -107,25 +117,33 @@ async fn main() -> Result<()> {
                 break;
             }
 
-            let decision = orchestrator.evaluate(input, &response).await?;
+            let decision = orchestrator.evaluate(input, &response.content).await?;
 
             match decision {
                 OrchestratorDecision::Complete => break,
                 OrchestratorDecision::NeedsMoreWork(reason) => {
                     println!("[Orchestrator: needs more work - {}]", reason);
-                    // For now, just ask conversationalist to elaborate
-                    let follow_up = format!("Please elaborate on your previous response. The issue: {}", reason);
-                    response = conversationalist.chat(conv, &follow_up).await?;
+
+                    // Add current response and follow-up to conversation
+                    state.add_message(response)?;
+                    let follow_up = drafter.create_message(
+                        "user".to_string(),
+                        format!("Please elaborate on your previous response. The issue: {}", reason),
+                    );
+                    state.add_message(follow_up)?;
+
+                    // Get updated messages and ask agent again
+                    let messages = &state.conversation_mut().unwrap().messages;
+                    response = agent.chat(messages).await?;
                     iterations += 1;
                 }
                 OrchestratorDecision::RouteToAgent(_) => break, // Shouldn't happen in evaluate
             }
         }
 
-        println!("Assistant: {}", response);
-
-        // Save periodically
-        state.save()?;
+        // Add final response to conversation and save
+        println!("Assistant: {}", response.content);
+        state.add_message(response)?;
     }
 
     Ok(())

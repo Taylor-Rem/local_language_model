@@ -1,11 +1,7 @@
 use anyhow::Result;
-use super::agent::{Agent};
+use super::agent::Agent;
+use super::agent_manager::AgentInfo;
 use crate::workers::Message;
-
-pub struct AgentInfo {
-    pub name: String,
-    pub description: String,
-}
 
 pub enum OrchestratorDecision {
     RouteToAgent(String),
@@ -64,16 +60,8 @@ Be concise. One word for routing, one line for evaluation."#,
     }
 
     /// Decide which agent should handle the request
-    pub async fn route(&self, message: &Message) -> Result<String> {
+    pub async fn route(&self, messages: &Vec<Message>) -> Result<String> {
         println!("Deciding what to do...");
-
-        let messages = vec![
-            self.agent.system_message(),
-            Message {
-                role: "user".to_string(),
-                content: format!("Route this request: {}", message.content),
-            },
-        ];
 
         let response = self.agent.chat(&messages).await?;
         let choice = response.content.trim().to_lowercase();

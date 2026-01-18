@@ -1,6 +1,8 @@
 use crate::workers::{Archivist, Message};
+use crate::workers::traits::{Resettable, Storage};
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 /// Represents a conversation with messages
 #[derive(Debug, Serialize, Deserialize)]
@@ -19,6 +21,25 @@ impl Conversation {
 
     pub fn add_message(&mut self, message: Message) {
         self.messages.push(message);
+    }
+}
+
+// =============================================================================
+// TRAIT: Display for Conversation
+// =============================================================================
+// Display lets us print a Conversation nicely. This shows the title and
+// message count, which is useful for debugging or showing conversation history.
+//
+// Note: We already have #[derive(Debug)] which gives us {:?} formatting.
+// Display ({}) is for human-readable output.
+impl fmt::Display for Conversation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "=== {} ===", self.title)?;
+        for msg in &self.messages {
+            // This uses Message's Display impl we created earlier!
+            writeln!(f, "{}", msg)?;
+        }
+        Ok(())
     }
 }
 pub struct StateManager {
@@ -53,7 +74,30 @@ impl StateManager {
         Ok(())
     }
 
-    pub fn reset(&mut self) {
+    pub fn add_message(&mut self, message: Message) -> Result<()> {
+        if let Some(ref mut conv) = self.conversation {
+            conv.add_message(message);
+        }
+        self.save()
+    }
+
+}
+
+// =============================================================================
+// TRAIT IMPLEMENTATION: Resettable for StateManager
+// =============================================================================
+// By implementing Resettable, StateManager can be reset through a standard
+// interface. This is useful when you have multiple components that need
+// resetting and you want to handle them uniformly.
+//
+// Example of using the trait:
+//   fn reset_all(items: &mut [&mut dyn Resettable]) {
+//       for item in items {
+//           item.reset();
+//       }
+//   }
+impl Resettable for StateManager {
+    fn reset(&mut self) {
         self.conversation = None;
     }
 }

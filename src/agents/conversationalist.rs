@@ -1,40 +1,50 @@
 use anyhow::Result;
+use async_trait::async_trait;
 use super::agent::Agent;
-use crate::workers::{Message, Conversation};
+use super::chat_agent::ChatAgent;
+use crate::workers::Message;
 
 pub struct Conversationalist {
     agent: Agent,
+    name: String,
+    description: String,
 }
 
 impl Conversationalist {
-    pub fn new(model: String, ollama_url: String, system_prompt: String) -> Self {
+    pub fn new(
+        model: String,
+        ollama_url: String,
+        system_prompt: String,
+        name: String,
+        description: String,
+    ) -> Self {
         let agent = Agent::new(model, ollama_url, system_prompt);
-        Self { agent }
+        Self { agent, name, description }
     }
 
     pub fn model(&self) -> &str {
         self.agent.model()
     }
+}
 
-    pub fn system_message(&self) -> Message {
+#[async_trait]
+impl ChatAgent for Conversationalist {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn description(&self) -> &str {
+        &self.description
+    }
+
+    fn system_message(&self) -> Message {
         self.agent.system_message()
     }
 
-    pub async fn chat(&self, conversation: &mut Conversation, user_input: &str) -> Result<String> {
-        // Add user message to conversation
-        let user_message = Message {
-            role: "user".to_string(),
-            content: user_input.to_string(),
-        };
-        conversation.add_message(user_message);
-
-        // Call agent.chat with conversation messages
-        let response = self.agent.chat(&conversation.messages).await?;
-        let content = response.content.clone();
-
-        // Add response to conversation
-        conversation.add_message(response);
-
-        Ok(content)
+    /// Process messages and return response.
+    /// Note: This agent does NOT modify conversation state.
+    /// The caller (main/orchestrator) is responsible for adding messages.
+    async fn chat(&self, messages: &[Message]) -> Result<Message> {
+        self.agent.chat(messages).await
     }
 }
