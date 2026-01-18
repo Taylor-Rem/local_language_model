@@ -541,6 +541,7 @@ dependencies = [
  "envy",
  "reqwest",
  "serde",
+ "serde_json",
  "tokio",
 ]
 
